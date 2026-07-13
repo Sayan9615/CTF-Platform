@@ -15,7 +15,9 @@
 
 
   Alte detalii relevante
+
 1.Platforma va comunica cu un server Linux local (localhost) sau cu un mediu izolat în care sunt găzduite challenge-urile.
+
 2.Challenge-urile vor fi realizate manual și vor acoperi concepte precum:utilizatori și grupuri;permisiuni și ownership;procese;servicii;cron jobs;log-uri;sistemul de fișiere.
   Pentru fiecare challenge va exista un flag unic care va confirma rezolvarea exercițiului.
   Platforma poate fi extinsă ulterior cu noi challenge-uri și niveluri de dificultate.
