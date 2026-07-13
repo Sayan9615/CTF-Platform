@@ -5,12 +5,19 @@
   Platforma va oferi o interfață prin care utilizatorii pot accesa diferite challenge-uri, fiecare având un scop bine definit și un flag ce trebuie descoperit prin utilizarea comenzilor și instrumentelor specifice sistemului Linux.
 
   Pașii urmați
+
 1.Analiza conceptelor de Sisteme de Operare ce pot fi transformate în challenge-uri.
+
 2.Proiectarea arhitecturii platformei.
+
 3.Implementarea interfeței utilizator.
+
 4.Implementarea serverului care găzduiește challenge-urile.
+
 5.Crearea manuală a challenge-urilor CTF.
+
 6.Implementarea sistemului de verificare a flag-urilor.
+
 7.Testarea platformei și a challenge-urilor.
 
 
