@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS CTF | Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    
+    <!-- Header -->
+    <header class="navbar">
+       <a href="index.html" class="logo flex-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 10 12 13 9 16"></polyline>
+                <line x1="14" y1="16" x2="17" y2="16"></line>
+            </svg>
+            OS-CTF
+        </a>
+        <div class="user-info">
+            <span class="user-score">Scor: <strong>0 pts</strong></span>
+            <span class="user-profile" id="display-username">👤 Se încarcă...</span>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        
+        <div class="dashboard-header">
+            <h2>Selectează o misiune</h2>
+            <p>Pornește instanța, conectează-te prin SSH și găsește flag-ul.</p>
+        </div>
+
+        <!-- Grila cu Challenge-uri -->
+        <div class="challenge-grid">
+            
+            <!-- Challenge 1 -->
+            <div class="challenge-card available" onclick="openModal(1, 'Sanity Check', 'Pentru a te obișnui cu platforma, conectează-te la instanță și listează fișierele din folderul tău.')">
+                <div class="card-header">
+                    <span class="category">Comenzi de bază</span>
+                    <span class="points">10 pts</span>
+                </div>
+                <h3>Sanity Check</h3>
+                <p class="difficulty easy">Ușor</p>
+                <div class="status">▶️ Disponibil</div>
+            </div>
+
+            <!-- Challenge 2 -->
+            <div class="challenge-card available" onclick="openModal(2, 'Cutia Pandorei', 'Pe server se află o arhivă numită <b>misiune.zip</b>.')">
+                <div class="card-header">
+                    <span class="category">Arhive & Ascunse</span>
+                    <span class="points">20 pts</span>
+                </div>
+                <h3>Cutia Pandorei</h3>
+                <p class="difficulty easy">Ușor</p>
+                <div class="status">▶️ Disponibil</div>
+            </div>
+
+            <!-- Challenge 3 -->
+            <div class="challenge-card available" onclick="openModal(3, 'Imaginea Vorbăreață', 'Ai primit pe server un fișier suspect numit <b>imagine.jpg</b>.')">
+                <div class="card-header">
+                    <span class="category">Analiză Text</span>
+                    <span class="points">30 pts</span>
+                </div>
+                <h3>Imaginea Vorbăreață</h3>
+                <p class="difficulty easy">Ușor</p>
+                <div class="status">▶️ Disponibil</div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Fereastra Modală (Ascunsă inițial) -->
+    <div id="challenge-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Nume Challenge</h2>
+                <button class="close-btn" onclick="closeModal()">✖</button>
+            </div>
+            
+            <div class="modal-body">
+                <h3>Misiune:</h3>
+                <p id="modal-desc" style="margin-bottom: 20px; line-height: 1.5;">Descriere...</p>
+                
+                <!-- Butonul de pornire a instanței -->
+                <div class="connection-box" style="margin-bottom: 20px;">
+                    <button id="btn-start-instance" class="btn-primary" onclick="startInstance()" style="width: 100%;">Lansează Instanța</button>
+                    
+                    <div id="ssh-info" class="hidden" style="margin-top: 15px; padding: 15px; background: #1a1a2e; border: 1px solid #7d4698; border-radius: 5px;">
+                        <p style="margin-bottom: 10px; font-size: 0.9rem;">Folosește comanda de mai jos în terminalul tău pentru a te conecta (Parola este <strong>student</strong>):</p>
+                        <code id="ssh-command" style="color: #00ffcc; font-size: 1.1rem; display: block; background: #0f0f1a; padding: 10px; border-radius: 3px;">Aștept datele de la server...</code>
+                    </div>
+                </div>
+
+                <form class="flag-form" onsubmit="submitFlag(event)">
+                    <input type="text" id="flag-input" placeholder="ATM_CTF{...}" required class="input-field">
+                    <button type="submit" class="btn-primary">Validează Flag</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

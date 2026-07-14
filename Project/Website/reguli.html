@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS CTF | Reguli</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    
+    <header class="navbar">
+        <a href="index.html" class="logo flex-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 10 12 13 9 16"></polyline>
+                <line x1="14" y1="16" x2="17" y2="16"></line>
+            </svg>
+            OS-CTF
+        </a>
+        <nav>
+            <ul class="nav-links">
+                <li><a href="despre.html">Despre</a></li>
+                <li><a href="reguli.html" style="color: var(--tor-purple);">Reguli</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="page-container">
+        <h1>Regulamentul CTF</h1>
+        
+        <p>Pentru a menține un mediu corect și funcțional pentru toți studenții, te rugăm să respecți următoarele reguli în timpul sesiunilor de antrenament.</p>
+        
+        <h2>1. Conduita pe Platformă</h2>
+        <ul>
+            <li><strong>Fără atacuri asupra infrastructurii:</strong> Este interzisă orice formă de atac de tip DoS/DDoS, brute-force asupra formularului de login sau încercarea de a exploata platforma web (frontend/backend).</li>
+            <li><strong>Ținta este mediul izolat:</strong> Acțiunile tale trebuie să se rezume strict la mediul Linux oferit prin conexiunea SSH la fiecare challenge.</li>
+        </ul>
+
+        <h2>2. Formatul Flag-urilor</h2>
+        <ul>
+            <li>Toate flag-urile respectă formatul: <code>ATM_CTF{un_text_oarecare}</code>.</li>
+            <li>Dacă găsești textul <em>"felicitari_ai_rezolvat"</em>, flag-ul pe care trebuie să îl introduci în platformă este <code>ATM_CTF{success}</code>.</li>
+            <li>Flag-urile sunt case-sensitive (se face distincția între litere mari și mici).</li>
+        </ul>
+
+        <h2>3. Colaborare și Partajare</h2>
+        <ul>
+            <li><strong>Este interzisă partajarea flag-urilor:</strong> Nu oferi flag-urile altor studenți. Scopul platformei este învățarea.</li>
+            <li>Colaborarea pentru a înțelege <em>conceptele</em> este încurajată, dar fiecare utilizator trebuie să descopere singur flag-ul pe mediul său.</li>
+        </ul>
+
+        <h2>4. Raportarea Erorilor</h2>
+        <p>Dacă descoperi o eroare în platformă, o problemă la conexiunea SSH sau un challenge care nu funcționează conform descrierii, te rugăm să-mi raportezi problema imediat. Nu încerca să exploatezi acea eroare.</p>
+    </main>
+
+</body>
+</html>
