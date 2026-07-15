@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -48,9 +50,55 @@ type VerifyRequest struct {
 	Flag        string `json:"flag"`
 }
 
-// ==========================
-// FUNCȚII AJUTĂTOARE
-// ==========================
+type UserStatusResponse struct {
+	Success bool  `json:"success"`
+	Score   int   `json:"score"`
+	Solved  []int `json:"solved"`
+}
+
+
+var challengeImages = map[int]string{
+	1: "os-ctf-chal1", // Sanity Check
+	2: "os-ctf-chal2", // Cutia Pandorei
+	3: "os-ctf-chal3", // Imaginea Vorbăreață
+}
+
+var challengePoints = map[int]int{
+	1: 10,
+	2: 20,
+	3: 30,
+}
+
+// Construiește comanda de injectare a flag-ului, specifică fiecărui challenge.
+// Rulează în interiorul containerului via 'docker exec'.
+func buildInjectCommand(challengeID int, flag string) string {
+	switch challengeID {
+	case 1:
+		// Sanity Check: flag-ul e direct într-un fișier text
+		return fmt.Sprintf("echo '%s' > /home/student/bun_venit.txt", flag)
+	case 2:
+		// Cutia Pandorei: flag-ul e într-un fișier ASCUNS (începe cu punct),
+		// dar cu un nume neutru care nu conține cuvântul "flag"
+		// (.sys_cache.dat), alături de alte 4 fișiere "momeală" normale.
+		// 'ls' fără -a nu-l arată, dar apare la 'unzip -l' / 'ls -a'.
+		// Sursele stau în /opt/pandora_src (nu în /home/student),
+		// deci nu sunt vizibile înainte ca arhiva să fie generată.
+		return fmt.Sprintf(
+			"sed -i 's/FLAG_PLACEHOLDER/%s/' /opt/pandora_src/.sys_cache.dat && "+
+				"cd /opt/pandora_src && zip -j /home/student/misiune.zip readme.txt notes.txt config.yml access.log todo.md .sys_cache.dat >/dev/null && "+
+				"chown student:student /home/student/misiune.zip",
+			flag)
+	case 3:
+		// Imaginea Vorbăreață: flag-ul e adăugat ca text la finalul
+		// fișierului JPG (nu afectează vizualizarea imaginii, dar
+		// apare la 'strings imagine.jpg').
+		return fmt.Sprintf("echo '%s' >> /home/student/imagine.jpg", flag)
+	default:
+		return ""
+	}
+}
+
+
 
 func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -77,15 +125,20 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		resp.Message = "Nu ai o instanță activă pentru acest challenge."
 	} else if solved {
 		resp.Success = false
-		resp.Message = "Ai rezolvat deja acest challenge!"
+		resp.Message = "Ai rezolvat deja acest challenge! Poți relua provocarea oricând, dar punctele nu se mai adaugă a doua oară."
 	} else if req.Flag == dbFlag {
-		// 2. Flag corect! Actualizăm scorul și statusul
+		
+		points, ok := challengePoints[req.ChallengeID]
+		if !ok {
+			points = 10 // fallback de siguranță dacă challenge-ul nu e în map
+		}
+
 		db.Exec("UPDATE active_challenges SET solved = 1 WHERE user_id = (SELECT id FROM users WHERE username = ?) AND challenge_id = ?", req.Username, req.ChallengeID)
-		db.Exec("UPDATE users SET score = score + 10 WHERE username = ?", req.Username) // Adăugăm 10 puncte
+		db.Exec("UPDATE users SET score = score + ? WHERE username = ?", points, req.Username)
 
 		resp.Success = true
-		resp.Message = "Flag corect! Ai primit 10 puncte."
-		log.Printf("[FLAG] Utilizatorul %s a rezolvat Challenge %d!", req.Username, req.ChallengeID)
+		resp.Message = fmt.Sprintf("Flag corect! Ai primit %d puncte.", points)
+		log.Printf("[FLAG] Utilizatorul %s a rezolvat Challenge %d! (+%d puncte)", req.Username, req.ChallengeID, points)
 	} else {
 		resp.Success = false
 		resp.Message = "Flag incorect, mai încearcă!"
@@ -102,7 +155,7 @@ func generateDynamicFlag() string {
 	return fmt.Sprintf("ATM_CTF{%s}", hex.EncodeToString(bytes))
 }
 
-// Permite cererile CORS (Cross-Origin) de la frontend
+
 func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -110,9 +163,7 @@ func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	return r.Method == "OPTIONS"
 }
 
-// ==========================
-// RUTELE API
-// ==========================
+
 
 func authHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -170,6 +221,79 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+
+func userStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if setupCORS(w, r) {
+		return
+	}
+
+	username := r.URL.Query().Get("username")
+	resp := UserStatusResponse{}
+
+	if username == "" {
+		resp.Success = false
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	var score int
+	err := db.QueryRow("SELECT score FROM users WHERE username = ?", username).Scan(&score)
+	if err != nil {
+		resp.Success = false
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	rows, err := db.Query(`
+		SELECT ac.challenge_id 
+		FROM active_challenges ac
+		JOIN users u ON ac.user_id = u.id
+		WHERE u.username = ? AND ac.solved = 1`, username)
+
+	solved := []int{}
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cid int
+			if rows.Scan(&cid) == nil {
+				solved = append(solved, cid)
+			}
+		}
+	}
+
+	resp.Success = true
+	resp.Score = score
+	resp.Solved = solved
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+
+func findFreePort() int {
+	used := map[int]bool{}
+
+	out, err := exec.Command("docker", "ps", "--format", "{{.Ports}}").Output()
+	if err == nil {
+		re := regexp.MustCompile(`:(\d+)->22/tcp`)
+		for _, match := range re.FindAllStringSubmatch(string(out), -1) {
+			if p, convErr := strconv.Atoi(match[1]); convErr == nil {
+				used[p] = true
+			}
+		}
+	} else {
+		log.Printf("[AVERTISMENT] Nu am putut lista containerele active pentru calculul portului: %v", err)
+	}
+
+	port := 2200
+	for used[port] {
+		port++
+	}
+	return port
+}
+
 func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
 		return
@@ -180,7 +304,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := StartResponse{}
 
-	// 1. Luăm ID-ul utilizatorului din baza de date
+	
 	var userID int
 	err := db.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&userID)
 	if err != nil {
@@ -191,8 +315,9 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Momentan am configurat doar Challenge 1 (Sanity Check)
-	if req.ChallengeID != 1 {
+	
+	image, ok := challengeImages[req.ChallengeID]
+	if !ok {
 		resp.Success = false
 		resp.Message = "Acest challenge nu este încă configurat pe server!"
 		w.Header().Set("Content-Type", "application/json")
@@ -202,30 +327,20 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[DOCKER] Pregătesc instanța pentru %s (Challenge %d)", req.Username, req.ChallengeID)
 
-	// 2. Găsim următorul port liber (începem de la 2200)
-	var maxPort sql.NullInt64
-	db.QueryRow("SELECT MAX(ssh_port) FROM active_challenges").Scan(&maxPort)
+	
+	port := findFreePort()
 
-	port := 2200
-	if maxPort.Valid && maxPort.Int64 >= 2200 {
-		port = int(maxPort.Int64) + 1
-	}
-
-	// 3. Generăm flag-ul
+	
 	flag := generateDynamicFlag()
 
-	// 4. Pornim containerul Docker
-	// Rulăm comanda: docker run -d -p PORT:22 os-ctf-chal1
-	// Dacă portul e deja ocupat, docker run CREEAZĂ totuși containerul înainte
-	// să eșueze la pornire, lăsând un container "orfan" în starea Created.
-	// De aceea îl ștergem imediat (docker rm) înainte să încercăm portul următor.
+	
 	var out []byte
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		cmd := exec.Command("docker", "run", "-d", "-p", fmt.Sprintf("%d:22", port), "os-ctf-chal1")
+		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d:22", port), image)
 
-		// IMPORTANT: folosim CombinedOutput ca să vedem și stderr, nu doar stdout.
+		
 		out, err = cmd.CombinedOutput()
 
 		if err == nil {
@@ -236,9 +351,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[EROARE DOCKER] Portul %d indisponibil: %s", port, outStr)
 
 		if strings.Contains(outStr, "port is already allocated") || strings.Contains(outStr, "Bind for") {
-			// docker run a apucat să creeze containerul înainte să eșueze la start.
-			// Extragem ID-ul (prima linie a output-ului) și îl ștergem, ca să nu
-			// rămână containere "Created" acumulate la infinit.
+			
 			lines := strings.Split(outStr, "\n")
 			if len(lines) > 0 {
 				possibleID := strings.TrimSpace(lines[0])
@@ -251,7 +364,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Altă eroare (imagine lipsă, permisiuni etc.) - nu are rost să retry-uim
+		
 		break
 	}
 
@@ -265,7 +378,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extragem ID-ul containerului (fără spații și enter-uri de la final)
+	
 	containerID := strings.TrimSpace(string(out))
 
 	if containerID == "" {
@@ -283,25 +396,31 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[DOCKER] Container pornit: %s pe portul %d", shortID, port)
 
-	// 5. Injectăm flag-ul în fișier (Magia CTF-ului)
-	injectCmd := fmt.Sprintf("echo '%s' > /home/student/bun_venit.txt", flag)
-	injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
-	if injectErr != nil {
-		// Nu oprim tot procesul, dar logăm eroarea ca să știm dacă flag-ul chiar a fost scris
-		log.Printf("[EROARE INJECT FLAG] %v | Output: %s", injectErr, strings.TrimSpace(string(injectOut)))
+	
+	injectCmd := buildInjectCommand(req.ChallengeID, flag)
+	if injectCmd != "" {
+		injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
+		if injectErr != nil {
+			// Nu oprim tot procesul, dar logăm eroarea ca să știm dacă flag-ul chiar a fost scris
+			log.Printf("[EROARE INJECT FLAG] %v | Output: %s", injectErr, strings.TrimSpace(string(injectOut)))
+		}
 	}
 
-	// 6. Salvăm totul în baza de date
+	
 	_, err = db.Exec(`
 		INSERT INTO active_challenges (user_id, challenge_id, container_id, ssh_port, dynamic_flag) 
-		VALUES (?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(user_id, challenge_id) DO UPDATE SET
+			container_id = excluded.container_id,
+			ssh_port = excluded.ssh_port,
+			dynamic_flag = excluded.dynamic_flag`,
 		userID, req.ChallengeID, containerID, port, flag)
 
 	if err != nil {
 		log.Printf("[EROARE DB] Nu am putut salva datele instanței: %v", err)
 	}
 
-	// 7. Trimitem succesul către frontend
+	
 	resp.Success = true
 	resp.Message = "Instanță pornită cu succes!"
 	resp.Port = port
@@ -318,9 +437,43 @@ func main() {
 	}
 	defer db.Close()
 
+	
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			score INTEGER NOT NULL DEFAULT 0
+		)`)
+	if err != nil {
+		log.Fatal("Eroare la crearea tabelului users:", err)
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS active_challenges (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			challenge_id INTEGER NOT NULL,
+			container_id TEXT,
+			ssh_port INTEGER,
+			dynamic_flag TEXT,
+			solved INTEGER NOT NULL DEFAULT 0,
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		)`)
+	if err != nil {
+		log.Fatal("Eroare la crearea tabelului active_challenges:", err)
+	}
+
+	
+	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_active_challenges_user_challenge ON active_challenges(user_id, challenge_id)`)
+	if err != nil {
+		log.Printf("[AVERTISMENT] Nu am putut crea indexul unic (poate există deja date duplicate): %v", err)
+	}
+
 	http.HandleFunc("/api/auth", authHandler)
-	http.HandleFunc("/api/start_challenge", startChallengeHandler) // RUTA NOUĂ PENTRU DOCKER
+	http.HandleFunc("/api/start_challenge", startChallengeHandler)
 	http.HandleFunc("/api/verify_flag", verifyFlagHandler)
+	http.HandleFunc("/api/user_status", userStatusHandler) 
 
 	fmt.Println("========================================")
 	fmt.Println("[*] Serverul OS-CTF Backend este ON!")
