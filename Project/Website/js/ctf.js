@@ -1,9 +1,8 @@
-
 const CTF = (() => {
 
     const API_BASE = 'http://localhost:5000';
 
-   
+    // Aici am adăugat noile provocări bazate pe Dockerfile-urile tale
     const CHALLENGES = [
         {
             id: 1,
@@ -28,13 +27,36 @@ const CTF = (() => {
             points: 30,
             difficulty: 'easy',
             description: 'Ai primit pe server un fișier suspect numit <b>imagine.jpg</b>. Uneori imaginile "vorbesc" mai mult decât par - încearcă să extragi textul din interiorul fișierului.'
+        },
+        {
+           id: 4,
+           title: 'Cifrul Cezarului (ROT13)' ,
+           category: 'Criptografie',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Pe server se află un fișier numit <b>mesaj_secret.txt</b>. Textul din interior a fost codat folosind cifrul ROT13. Citește fișierul și decodează mesajul (hint: poți folosi utilitarul <code>tr</code> din Linux).'
+        },
+        {
+           id: 5,
+           title: 'Șirul Bazei 64' ,
+           category: 'Criptografie',
+           points: 40,
+           difficulty: 'easy',
+           description: 'În directorul tău home vei găsi un fișier numit <b>secret.b64</b>. Conținutul său nu poate fi citit direct pentru că este codat în format Base64. Folosește comanda potrivită în terminal pentru a decoda șirul și a obține flag-ul.'
+        },
+        {
+           id: 6,
+           title: 'Procesul Fantomă' ,
+           category: 'Administrare Procese',
+           points: 50,
+           difficulty: 'medium',
+           description: 'Niciun fișier de data aceasta! Pe server rulează un proces suspect în fundal (background). Folosește utilitare de monitorizare a sistemului (cum ar fi <code>ps aux</code> sau <code>top</code>) pentru a inspecta procesele active. Flag-ul este ascuns chiar în comanda care a lansat acel proces fantomă.'
         }
     ];
 
     let currentChallengeId = null;
     let solvedIds = new Set();
 
-   
     function renderGrid() {
         const grid = document.getElementById('challenge-grid');
         if (!grid) return;
@@ -54,7 +76,7 @@ const CTF = (() => {
                     <span class="points">${ch.points} pts</span>
                 </div>
                 <h3>${ch.title}</h3>
-                <p class="difficulty easy">${ch.difficulty === 'easy' ? 'Ușor' : ch.difficulty}</p>
+                <p class="difficulty ${ch.difficulty}">${ch.difficulty === 'easy' ? 'Ușor' : ch.difficulty === 'medium' ? 'Mediu' : 'Greu'}</p>
                 <div class="status">${isSolved ? '✅ Rezolvat' : '▶️ Disponibil'}</div>
             `;
 
@@ -62,7 +84,6 @@ const CTF = (() => {
         });
     }
 
-   
     function openModal(challengeId) {
         const ch = CHALLENGES.find(c => c.id === challengeId);
         if (!ch) return;
@@ -88,7 +109,6 @@ const CTF = (() => {
         currentChallengeId = null;
     }
 
-   
     async function startInstance() {
         const username = getUsername();
 
@@ -138,7 +158,6 @@ const CTF = (() => {
         }
     }
 
-   
     async function submitFlag(event) {
         event.preventDefault();
 
@@ -180,7 +199,6 @@ const CTF = (() => {
         }
     }
 
-   
     async function refreshScore() {
         const username = getUsername();
         if (!username || username === 'Guest') return;
@@ -207,7 +225,6 @@ const CTF = (() => {
         return urlParams.get('username');
     }
 
-   
     function init() {
         renderGrid();
         refreshScore();
@@ -222,8 +239,12 @@ const CTF = (() => {
     };
 })();
 
-
 window.openModal = (id) => CTF.openModal(id);
 window.closeModal = () => CTF.closeModal();
 window.startInstance = () => CTF.startInstance();
 window.submitFlag = (e) => CTF.submitFlag(e);
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    CTF.init();
+});

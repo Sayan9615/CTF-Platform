@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -56,17 +57,44 @@ type UserStatusResponse struct {
 	Solved  []int `json:"solved"`
 }
 
-
+// ==========================
+// CONFIGURAȚIA CHALLENGE-URILOR
+// Adaugă aici orice challenge nou: imaginea Docker folosită și
+// câte puncte valorează. Trebuie sincronizat cu array-ul CHALLENGES
+// din ctf.js (id-urile trebuie să coincidă).
+// ==========================
 var challengeImages = map[int]string{
 	1: "os-ctf-chal1", // Sanity Check
 	2: "os-ctf-chal2", // Cutia Pandorei
 	3: "os-ctf-chal3", // Imaginea Vorbăreață
+	4: "os-ctf-chal4", // Cifrul lui Cezar (ROT13)
+	5: "os-ctf-chal5", // Codul Ascuns (Base64)
+	6: "os-ctf-chal6", // Procesul Fantomă (variabilă de mediu)
 }
 
 var challengePoints = map[int]int{
 	1: 10,
 	2: 20,
 	3: 30,
+	4: 40,
+	5: 40,
+	6: 50,
+}
+
+// Aplică ROT13 (Cifrul lui Cezar cu deplasare 13) pe un text.
+// Literele sunt rotite, orice alt caracter (cifre, {, }, _, spații) rămâne neschimbat.
+func rot13(input string) string {
+	rot := func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return 'a' + (r-'a'+13)%26
+		case r >= 'A' && r <= 'Z':
+			return 'A' + (r-'A'+13)%26
+		default:
+			return r
+		}
+	}
+	return strings.Map(rot, input)
 }
 
 // Construiește comanda de injectare a flag-ului, specifică fiecărui challenge.
@@ -93,12 +121,41 @@ func buildInjectCommand(challengeID int, flag string) string {
 		// fișierului JPG (nu afectează vizualizarea imaginii, dar
 		// apare la 'strings imagine.jpg').
 		return fmt.Sprintf("echo '%s' >> /home/student/imagine.jpg", flag)
+	case 4:
+		// Cifrul lui Cezar: un mesaj (instrucțiuni + flag) e criptat
+		// integral cu ROT13 și salvat în mesaj_secret.txt. Trimitem
+		// conținutul deja codat Base64 prin shell, ca să evităm
+		// problemele de escaping cu newline-uri/caractere speciale.
+		plain := fmt.Sprintf(
+			"Salut! Acest mesaj este criptat cu ROT13 (Cifrul lui Cezar).\nDecodeaza-l ca sa gasesti flag-ul.\n\n%s\n",
+			flag)
+		encoded := rot13(plain)
+		b64 := base64.StdEncoding.EncodeToString([]byte(encoded))
+		return fmt.Sprintf(
+			"echo '%s' | base64 -d > /home/student/mesaj_secret.txt && chown student:student /home/student/mesaj_secret.txt",
+			b64)
+	case 5:
+		// Codul Ascuns: flag-ul codat simplu Base64, într-un fișier .b64
+		b64 := base64.StdEncoding.EncodeToString([]byte(flag))
+		return fmt.Sprintf(
+			"echo '%s' > /home/student/secret.b64 && chown student:student /home/student/secret.b64",
+			b64)
+	case 6:
+		// Procesul Fantomă: pornim un proces în fundal, deținut de
+		// utilizatorul student, cu flag-ul într-o variabilă de mediu.
+		// setsid + redirectare completă = procesul rămâne "daemon",
+		// independent de sesiunea SSH curentă sau de docker exec.
+		return fmt.Sprintf(
+			`su - student -c "env FLAG='%s' setsid sleep infinity < /dev/null > /dev/null 2>&1 &"`,
+			flag)
 	default:
 		return ""
 	}
 }
 
-
+// ==========================
+// FUNCȚII AJUTĂTOARE
+// ==========================
 
 func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -127,7 +184,7 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		resp.Success = false
 		resp.Message = "Ai rezolvat deja acest challenge! Poți relua provocarea oricând, dar punctele nu se mai adaugă a doua oară."
 	} else if req.Flag == dbFlag {
-		
+		// 2. Flag corect! Actualizăm scorul și statusul
 		points, ok := challengePoints[req.ChallengeID]
 		if !ok {
 			points = 10 // fallback de siguranță dacă challenge-ul nu e în map
@@ -155,7 +212,7 @@ func generateDynamicFlag() string {
 	return fmt.Sprintf("ATM_CTF{%s}", hex.EncodeToString(bytes))
 }
 
-
+// Permite cererile CORS (Cross-Origin) de la frontend
 func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -163,7 +220,9 @@ func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	return r.Method == "OPTIONS"
 }
 
-
+// ==========================
+// RUTELE API
+// ==========================
 
 func authHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -221,7 +280,9 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-
+// Returnează scorul curent și lista de challenge-uri rezolvate ale unui utilizator.
+// Apelat de ctf.js la încărcarea dashboard-ului și după fiecare flag corect,
+// ca sursa de adevăr să fie mereu baza de date, nu starea locală din JS.
 func userStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
 		return
@@ -271,7 +332,10 @@ func userStatusHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-
+// Returnează portul cel mai mic, începând de la 2200, care NU e folosit
+// de niciun container Docker activ în acest moment. Spre deosebire de
+// varianta veche (bazată pe MAX(ssh_port) din DB), asta permite refolosirea
+// porturilor eliberate după ce monitor.sh oprește și șterge un container.
 func findFreePort() int {
 	used := map[int]bool{}
 
@@ -304,7 +368,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := StartResponse{}
 
-	
+	// 1. Luăm ID-ul utilizatorului din baza de date
 	var userID int
 	err := db.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&userID)
 	if err != nil {
@@ -315,7 +379,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
+	// Verificăm dacă challenge-ul are o imagine Docker configurată
 	image, ok := challengeImages[req.ChallengeID]
 	if !ok {
 		resp.Success = false
@@ -327,20 +391,26 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[DOCKER] Pregătesc instanța pentru %s (Challenge %d)", req.Username, req.ChallengeID)
 
-	
+	// 2. Găsim primul port liber, verificând containerele Docker
+	// active în acest moment (nu istoricul din DB, care rămâne
+	// cu porturi vechi chiar și după ce containerele au fost șterse).
 	port := findFreePort()
 
-	
+	// 3. Generăm flag-ul
 	flag := generateDynamicFlag()
 
-	
+	// 4. Pornim containerul Docker
+	// Rulăm comanda: docker run -d -p PORT:22 os-ctf-chal1
+	// Dacă portul e deja ocupat, docker run CREEAZĂ totuși containerul înainte
+	// să eșueze la pornire, lăsând un container "orfan" în starea Created.
+	// De aceea îl ștergem imediat (docker rm) înainte să încercăm portul următor.
 	var out []byte
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d:22", port), image)
 
-		
+		// IMPORTANT: folosim CombinedOutput ca să vedem și stderr, nu doar stdout.
 		out, err = cmd.CombinedOutput()
 
 		if err == nil {
@@ -351,7 +421,9 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[EROARE DOCKER] Portul %d indisponibil: %s", port, outStr)
 
 		if strings.Contains(outStr, "port is already allocated") || strings.Contains(outStr, "Bind for") {
-			
+			// docker run a apucat să creeze containerul înainte să eșueze la start.
+			// Extragem ID-ul (prima linie a output-ului) și îl ștergem, ca să nu
+			// rămână containere "Created" acumulate la infinit.
 			lines := strings.Split(outStr, "\n")
 			if len(lines) > 0 {
 				possibleID := strings.TrimSpace(lines[0])
@@ -364,7 +436,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		
+		// Altă eroare (imagine lipsă, permisiuni etc.) - nu are rost să retry-uim
 		break
 	}
 
@@ -378,7 +450,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
+	// Extragem ID-ul containerului (fără spații și enter-uri de la final)
 	containerID := strings.TrimSpace(string(out))
 
 	if containerID == "" {
@@ -396,7 +468,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[DOCKER] Container pornit: %s pe portul %d", shortID, port)
 
-	
+	// 5. Injectăm flag-ul specific fiecărui challenge (vezi buildInjectCommand)
 	injectCmd := buildInjectCommand(req.ChallengeID, flag)
 	if injectCmd != "" {
 		injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
@@ -406,7 +478,11 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	
+	// 6. Salvăm totul în baza de date.
+	// Folosim UPSERT: dacă userul mai are deja un rând pentru acest challenge
+	// (l-a mai lansat înainte), îl actualizăm cu noul container/port/flag,
+	// dar NU atingem coloana 'solved' - dacă era deja rezolvat, rămâne rezolvat,
+	// iar punctele nu se vor mai aduna a doua oară la un submit ulterior.
 	_, err = db.Exec(`
 		INSERT INTO active_challenges (user_id, challenge_id, container_id, ssh_port, dynamic_flag) 
 		VALUES (?, ?, ?, ?, ?)
@@ -420,7 +496,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[EROARE DB] Nu am putut salva datele instanței: %v", err)
 	}
 
-	
+	// 7. Trimitem succesul către frontend
 	resp.Success = true
 	resp.Message = "Instanță pornită cu succes!"
 	resp.Port = port
@@ -437,7 +513,7 @@ func main() {
 	}
 	defer db.Close()
 
-	
+	// Creăm tabelele dacă nu există deja (prima rulare / DB proaspătă)
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
