@@ -70,6 +70,9 @@ var challengeImages = map[int]string{
 	4: "os-ctf-chal4", // Cifrul lui Cezar (ROT13)
 	5: "os-ctf-chal5", // Codul Ascuns (Base64)
 	6: "os-ctf-chal6", // Procesul Fantomă (variabilă de mediu)
+	7: "os-ctf-chal7", // Deghizarea (extensie mincinoasă)
+	8: "os-ctf-chal8", // Ușa Încuiată (sudo/permisiuni)
+	9: "os-ctf-chal9", // Straturi (encoding multi-strat)
 }
 
 var challengePoints = map[int]int{
@@ -79,6 +82,9 @@ var challengePoints = map[int]int{
 	4: 40,
 	5: 40,
 	6: 50,
+	7: 40,
+	8: 30,
+	9: 60,
 }
 
 // Aplică ROT13 (Cifrul lui Cezar cu deplasare 13) pe un text.
@@ -148,6 +154,34 @@ func buildInjectCommand(challengeID int, flag string) string {
 		return fmt.Sprintf(
 			`su - student -c "env FLAG='%s' setsid sleep infinity < /dev/null > /dev/null 2>&1 &"`,
 			flag)
+	case 7:
+		// Deghizarea: un fișier numit poza.png, dar care e de fapt
+		// text simplu - studentul trebuie să folosească 'file poza.png'
+		// ca să descopere tipul real, apoi 'cat' pentru flag.
+		// Trimis prin base64 ca să evităm probleme de escaping cu newline-uri.
+		content := fmt.Sprintf("Raport confidential. Nu distribui acest fisier.\n%s\n", flag)
+		b64content := base64.StdEncoding.EncodeToString([]byte(content))
+		return fmt.Sprintf(
+			"echo '%s' | base64 -d > /home/student/poza.png && chown student:student /home/student/poza.png",
+			b64content)
+	case 8:
+		// Ușa Încuiată: /root/secret.txt e citibil doar de root (chmod 600),
+		// dar regula din /etc/sudoers.d (definită static în Dockerfile.chal8)
+		// îi permite lui 'student' să ruleze DOAR 'sudo cat /root/secret.txt'
+		// fără parolă. La runtime doar populăm conținutul real al fișierului.
+		return fmt.Sprintf(
+			"echo '%s' > /root/secret.txt && chmod 600 /root/secret.txt && chown root:root /root/secret.txt",
+			flag)
+	case 9:
+		// Straturi: flag-ul e codat pe 3 straturi succesive:
+		// hex -> ROT13 -> Base64. Studentul trebuie să dea peel invers:
+		// base64 -d, apoi tr ROT13 (auto-invers), apoi hex decode (xxd -r -p).
+		hexEncoded := hex.EncodeToString([]byte(flag))
+		rotated := rot13(hexEncoded)
+		b64layers := base64.StdEncoding.EncodeToString([]byte(rotated))
+		return fmt.Sprintf(
+			"echo '%s' > /home/student/layers.txt && chown student:student /home/student/layers.txt",
+			b64layers)
 	default:
 		return ""
 	}
@@ -540,7 +574,6 @@ func main() {
 		log.Fatal("Eroare la crearea tabelului active_challenges:", err)
 	}
 
-	
 	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_active_challenges_user_challenge ON active_challenges(user_id, challenge_id)`)
 	if err != nil {
 		log.Printf("[AVERTISMENT] Nu am putut crea indexul unic (poate există deja date duplicate): %v", err)
@@ -549,10 +582,10 @@ func main() {
 	http.HandleFunc("/api/auth", authHandler)
 	http.HandleFunc("/api/start_challenge", startChallengeHandler)
 	http.HandleFunc("/api/verify_flag", verifyFlagHandler)
-	http.HandleFunc("/api/user_status", userStatusHandler) 
+	http.HandleFunc("/api/user_status", userStatusHandler)
 
 	fmt.Println("========================================")
-	fmt.Println("[*] Serverul OS-CTF Backend este ON!")
+	fmt.Println("[*] Serverul OS-CTF este ON")
 	fmt.Println("[*] Ascult pe portul 5000...")
 	fmt.Println("========================================")
 

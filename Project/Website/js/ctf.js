@@ -51,6 +51,30 @@ const CTF = (() => {
            points: 50,
            difficulty: 'medium',
            description: 'Niciun fișier de data aceasta! Pe server rulează un proces suspect în fundal (background). Folosește utilitare de monitorizare a sistemului (cum ar fi <code>ps aux</code> sau <code>top</code>) pentru a inspecta procesele active. Flag-ul este ascuns chiar în comanda care a lansat acel proces fantomă.'
+        },
+        {
+           id: 7,
+           title: 'Deghizarea',
+           category: 'Steganografie',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Ai primit fișierul <b>poza.png</b>. Ceva nu e în regulă cu el - verifică ce tip de fișier este de fapt (nu te lua doar după extensie).'
+        },
+        {
+           id: 8,
+           title: 'Ușa Încuiată',
+           category: 'Permisiuni & Utilizatori',
+           points: 30,
+           difficulty: 'easy',
+           description: 'Există un fișier <b>/root/secret.txt</b> pe care doar root îl poate citi direct. Verifică ce comenzi cu privilegii de root ai voie să rulezi (<code>sudo -l</code>).'
+        },
+        {
+           id: 9,
+           title: 'Straturi',
+           category: 'Criptografie',
+           points: 60,
+           difficulty: 'medium',
+           description: 'Fișierul <b>layers.txt</b> conține flag-ul, dar codat pe mai multe straturi succesive. Decodează pas cu pas, ca la o ceapă - verifică după fiecare pas ce fel de date obții.'
         }
     ];
 
