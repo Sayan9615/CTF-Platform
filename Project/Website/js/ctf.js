@@ -78,12 +78,12 @@ const CTF = (() => {
         },
         {
            id: 10,
-           title: 'Min3c4a7t',
+           title: 'Min3cr47t',
            category: 'Misc',
            points: 100,
            difficulty: 'hard',
            connectionType: 'minecraft',
-           description: 'Pe server rulează o instanță de Minecraft (versiunea 1.26.2). Conectează-te la adresa primită mai jos și cauta flag-ul conform indiciilor.'
+           description: 'Pe server rulează o instanță de Minecraft (versiunea 26.2). Conectează-te la adresa primită mai jos și cauta flag-ul conform indiciilor.'
         }
     ];
 

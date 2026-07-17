@@ -1,7 +1,7 @@
 FROM itzg/minecraft-server:latest
 
 ENV EULA=TRUE
-ENV VERSION=1.26.2
+ENV VERSION=26.2
 ENV TYPE=VANILLA
 ENV ONLINE_MODE=FALSE
 ENV ENABLE_RCON=true
@@ -9,7 +9,6 @@ ENV RCON_PASSWORD=ctf_internal_pw
 ENV MEMORY=1G
 ENV MOTD="OS-CTF - Coordonatele Comorii"
 
-
-COPY CTF_MAP /data/world
+COPY --chown=1000:1000 CTF_MAP /data/world
 
 EXPOSE 25565
