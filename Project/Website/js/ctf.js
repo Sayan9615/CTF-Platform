@@ -75,6 +75,15 @@ const CTF = (() => {
            points: 60,
            difficulty: 'medium',
            description: 'Fișierul <b>layers.txt</b> conține flag-ul, dar codat pe mai multe straturi succesive. Decodează pas cu pas, ca la o ceapă - verifică după fiecare pas ce fel de date obții.'
+        },
+        {
+           id: 10,
+           title: 'Min3c4a7t',
+           category: 'Misc',
+           points: 100,
+           difficulty: 'hard',
+           connectionType: 'minecraft',
+           description: 'Pe server rulează o instanță de Minecraft (versiunea 1.26.2). Conectează-te la adresa primită mai jos și cauta flag-ul conform indiciilor.'
         }
     ];
 
@@ -145,12 +154,26 @@ const CTF = (() => {
             return;
         }
 
+        const ch = CHALLENGES.find(c => c.id === currentChallengeId);
+        const isMinecraft = ch && ch.connectionType === 'minecraft';
+
         document.getElementById('btn-start-instance').classList.add('hidden');
         const sshInfo = document.getElementById('ssh-info');
         sshInfo.classList.remove('hidden');
 
+        // Textul de instrucțiuni diferă: SSH cere comandă + parolă,
+        // Minecraft cere doar adresa de server (Direct Connect).
+        const instructionsP = sshInfo.querySelector('p');
+        if (instructionsP) {
+            instructionsP.innerHTML = isMinecraft
+                ? 'Conectează-te din Minecraft (Multiplayer → Direct Connect) la adresa de mai jos (versiune <strong>1.26.2</strong>):'
+                : 'Folosește comanda de mai jos în terminalul tău pentru a te conecta (Parola este <strong>student</strong>):';
+        }
+
         const sshCommandText = document.getElementById('ssh-command');
-        sshCommandText.innerText = "Se creează mediul izolat... te rugăm așteaptă.";
+        sshCommandText.innerText = isMinecraft
+            ? "Se pornește serverul Minecraft... poate dura până la 1-2 minute la prima pornire."
+            : "Se creează mediul izolat... te rugăm așteaptă.";
         sshCommandText.style.color = "#ffcc00";
 
         try {
@@ -165,7 +188,9 @@ const CTF = (() => {
             const result = await response.json();
 
             if (result.success) {
-                sshCommandText.innerText = `ssh student@127.0.0.1 -p ${result.port}`;
+                sshCommandText.innerText = isMinecraft
+                    ? `127.0.0.1:${result.port}`
+                    : `ssh student@127.0.0.1 -p ${result.port}`;
                 sshCommandText.style.color = "#00ffcc";
             } else {
                 sshCommandText.innerText = "Eroare: " + result.message;
