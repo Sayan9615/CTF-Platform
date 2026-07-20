@@ -1,30 +1,167 @@
 # CTF-Platform
 
-  Proiectul constă în dezvoltarea unei platforme care permite desfășurarea unor challenge-uri de tip CTF (Capture The Flag) create special pentru exersarea conceptelor studiate la disciplina Sisteme de Operare.
+Platformă web pentru desfășurarea unor challenge-uri de tip **CTF (Capture The Flag)**, create special pentru exersarea conceptelor studiate la disciplina **Sisteme de Operare**.
 
-  Platforma va oferi o interfață prin care utilizatorii pot accesa diferite challenge-uri, fiecare având un scop bine definit și un flag ce trebuie descoperit prin utilizarea comenzilor și instrumentelor specifice sistemului Linux.
+Utilizatorii se autentifică, aleg un challenge din dashboard, pornesc o instanță izolată (container Docker) sau descarcă resursa necesară, și găsesc un **flag unic** folosind comenzi și instrumente specifice sistemului Linux.
 
-  Pașii urmați
+---
 
-1.Analiza conceptelor de Sisteme de Operare ce pot fi transformate în challenge-uri.
+## Arhitectură
 
-2.Proiectarea arhitecturii platformei.
+```
+┌─────────────────┐        HTTP (port 5000)        ┌──────────────────┐
+│   Browser        │ ─────────────────────────────▶ │   server.go       │
+│  (dashboard.html) │ ◀───────────────────────────── │  (Go + SQLite)    │
+└─────────────────┘        JSON API + fișiere        └──────────────────┘
+                                                              │
+                                                              │ docker run / docker exec
+                                                              ▼
+                                                     ┌──────────────────┐
+                                                     │  Containere       │
+                                                     │  Docker (SSH)     │
+                                                     │  câte unul per    │
+                                                     │  instanță/user    │
+                                                     └──────────────────┘
+```
 
-3.Implementarea interfeței utilizator.
+- **Frontend**: HTML/CSS/JS static (`Website/`), fără framework — `dashboard.html` randează dinamic lista de challenge-uri din `ctf.js`.
+- **Backend**: un singur binar Go (`server.go`) care servește atât API-ul (`/api/...`), **cât și fișierele front-end** (nu mai e nevoie de alt webserver, ex. Python).
+- **Bază de date**: SQLite (`ctf_platform.db`), creată automat la prima pornire — ține conturile, scorurile și starea fiecărui challenge per utilizator.
+- **Izolare**: fiecare challenge SSH rulează într-un container Docker separat, cu flag generat dinamic la pornire și un port SSH unic alocat automat.
+- **Auto-cleanup**: containerele au un script (`monitor.sh`) care oprește și șterge automat instanța când studentul se deconectează (fără intervenție manuală).
 
-4.Implementarea serverului care găzduiește challenge-urile.
+---
 
-5.Crearea manuală a challenge-urilor CTF.
+## Structura proiectului
 
-6.Implementarea sistemului de verificare a flag-urilor.
+```
+Project/
+├── server.go              # backend Go (API + servire frontend)
+├── ctf_platform.db         # baza de date SQLite (generată automat)
+├── Website/
+│   ├── index.html           # pagina de login
+│   ├── dashboard.html        # dashboard cu challenge-uri
+│   ├── css/style.css
+│   ├── js/
+│   │   ├── ctf.js            # definirea challenge-urilor + logica CTF
+│   │   └── main.js            # login/auth + inițializare dashboard
+│   └── assets/
+│       └── CTF_MAP.zip        # resursă pentru challenge-ul Minecraft
+├── chal1_sanity/            # Dockerfile + monitor.sh pentru fiecare challenge
+├── chal2_pandora/
+├── chal3_imagine/
+├── ...
+└── chal9_straturi/
+```
 
-7.Testarea platformei și a challenge-urilor.
+Fiecare folder `chalN_*` conține `Dockerfile` + `monitor.sh` folosit la build-ul imaginii `os-ctf-chalN`.
 
+---
 
-  Alte detalii relevante
+## Instalare & rulare
 
-1.Platforma va comunica cu un server Linux local (localhost) sau cu un mediu izolat în care sunt găzduite challenge-urile.
+### Cerințe
+- Go (1.20+)
+- Docker
+- SQLite3 (`go-sqlite3`, se instalează automat la `go run`/`go build`)
 
-2.Challenge-urile vor fi realizate manual și vor acoperi concepte precum:utilizatori și grupuri;permisiuni și ownership;procese;servicii;cron jobs;log-uri;sistemul de fișiere.
-  Pentru fiecare challenge va exista un flag unic care va confirma rezolvarea exercițiului.
-  Platforma poate fi extinsă ulterior cu noi challenge-uri și niveluri de dificultate.
+### 1. Construiește imaginile Docker (o singură dată, pentru fiecare challenge)
+
+```bash
+cd chal1_sanity/ && docker build -f Dockerfile -t os-ctf-chal1 . && cd ..
+cd chal2_pandora/ && docker build -f Dockerfile -t os-ctf-chal2 . && cd ..
+# ... la fel pentru chal3 → chal9
+```
+
+### 2. Pornește serverul
+
+Din folderul care conține atât `server.go`, cât și `Website/`:
+
+```bash
+sudo go run server.go
+```
+
+> `sudo` e necesar dacă utilizatorul curent nu e în grupul `docker` (`docker run`/`docker exec` cer acces la `/var/run/docker.sock`). Alternativ: `sudo usermod -aG docker $USER` + relogare, apoi rulezi fără `sudo`.
+
+Serverul pornește pe portul **5000** și servește tot (API + interfață).
+
+### 3. Deschide platforma
+
+```
+http://localhost:5000/index.html
+```
+
+---
+
+## Conectare din rețea (mai mulți utilizatori)
+
+Platforma nu e limitată la mașina pe care rulează serverul — oricine din aceeași rețea locală se poate conecta.
+
+**1. Află IP-ul mașinii care rulează `server.go`:**
+```bash
+hostname -I
+```
+(ex: `172.20.10.2`)
+
+**2. Deschide portul în firewall** (o singură dată):
+```bash
+sudo ufw allow 5000/tcp
+sudo ufw allow 2200:2300/tcp   # range-ul de porturi SSH alocate instanțelor
+```
+
+**3. Ceilalți utilizatori accesează** din browser, folosind structura de mai sus în loc de `localhost`:
+```
+IP_utilizator_care_deschide_server.go:5000
+```
+
+Frontend-ul (`ctf.js`) detectează automat adresa serverului din URL (`window.location.hostname`), deci **nu trebuie modificat nimic în cod** pentru asta — funcționează identic indiferent de IP-ul folosit.
+
+> Notă: dacă serverul rulează într-o mașină virtuală (ex. VirtualBox), adaptorul de rețea trebuie setat pe **Bridged** (nu NAT), altfel VM-ul nu e vizibil din restul rețelei.
+
+---
+
+## Cum funcționează un challenge (flux tipic)
+
+1. Studentul apasă **"Lansează Instanța"** → frontend-ul trimite `POST /api/start_challenge`.
+2. Serverul găsește un port SSH liber, pornește un container Docker nou din imaginea challenge-ului, generează un **flag unic** (`ATM_CTF{...}`) și îl injectează în container (fișier, arhivă, proces etc., diferit pentru fiecare challenge).
+3. Studentul primește comanda SSH (`ssh student@<ip> -p <port>`, parola `student`), se conectează și investighează sistemul.
+4. Găsește flagul și îl trimite prin formularul din dashboard → `POST /api/verify_flag`.
+5. Dacă e corect, scorul se actualizează și challenge-ul se marchează **"Rezolvat"**. Poate fi reluat oricând, dar punctele nu se mai adaugă a doua oară.
+6. Când studentul se deconectează de la SSH, containerul se oprește și se șterge automat.
+
+---
+
+## Challenge-uri implementate
+
+| # | Nume | Concept SO | Dificultate | Puncte |
+|---|------|-----------|:---:|:---:|
+| 1 | Sanity Check | comenzi de bază, navigare în sistemul de fișiere | Ușor | 10 |
+| 2 | Cutia Pandorei | arhive, fișiere ascunse | Ușor | 20 |
+| 3 | Imaginea Vorbăreață | analiză de fișiere binare (`strings`) | Ușor | 30 |
+| 4 | Cifrul Cezarului (ROT13) | procesare text în shell | Ușor | 40 |
+| 5 | Șirul Bazei 64 | codare/decodare | Ușor | 40 |
+| 6 | Procesul Fantomă | procese, `/proc`, variabile de mediu | Mediu | 50 |
+| 7 | Deghizarea | steganografie, identificarea tipului real al unui fișier | Ușor | 40 |
+| 8 | Ușa Încuiată | permisiuni, `sudo`, ownership | Ușor | 30 |
+| 9 | Straturi | codare pe mai multe niveluri (hex/ROT13/Base64) | Mediu | 60 |
+| 10 | M1n3cr4ft | challenge bonus (hartă statică, fără server dedicat) | Greu | 100 |
+
+---
+
+## Cum adaugi un challenge nou
+
+1. **Definește-l** în `Website/js/ctf.js`, în array-ul `CHALLENGES` (id, titlu, categorie, puncte, dificultate, descriere).
+2. **Creează imaginea Docker** (`Dockerfile.chalN` + `monitor.sh`, după modelul celorlalte).
+3. **Înregistrează-l** în `server.go`:
+   - adaugă imaginea în `challengeImages`
+   - adaugă punctajul în `challengePoints`
+   - adaugă un `case` nou în `buildInjectCommand` cu logica de injectare a flagului, specifică challenge-ului
+4. Build imagine + restart server.
+
+---
+
+## Sistem de scor
+
+- Fiecare utilizator are un scor total, actualizat la fiecare flag corect.
+- Un challenge rezolvat rămâne marcat "Rezolvat" definitiv — poate fi refăcut oricând (util pentru practică), dar punctele se acordă o singură dată.
+- Scorul și lista challenge-urilor rezolvate se sincronizează mereu cu baza de date (`GET /api/user_status`), nu se bazează pe stare locală din browser.

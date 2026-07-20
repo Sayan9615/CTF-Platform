@@ -21,7 +21,9 @@ import (
 
 var db *sql.DB
 
-
+// ==========================
+// STRUCTURI DE DATE
+// ==========================
 type AuthRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -57,18 +59,16 @@ type UserStatusResponse struct {
 }
 
 
-
 var challengeImages = map[int]string{
-	1:  "os-ctf-chal1",  // Sanity Check
-	2:  "os-ctf-chal2",  // Cutia Pandorei
-	3:  "os-ctf-chal3",  // Imaginea Vorbăreață
-	4:  "os-ctf-chal4",  // Cifrul lui Cezar (ROT13)
-	5:  "os-ctf-chal5",  // Codul Ascuns (Base64)
-	6:  "os-ctf-chal6",  // Procesul Fantomă (variabilă de mediu)
-	7:  "os-ctf-chal7",  // Deghizarea (extensie mincinoasă)
-	8:  "os-ctf-chal8",  // Ușa Încuiată (sudo/permisiuni)
-	9:  "os-ctf-chal9",  // Straturi (encoding multi-strat)
-	10: "os-ctf-chal10", // Min3cr47t
+	1: "os-ctf-chal1", // Sanity Check
+	2: "os-ctf-chal2", // Cutia Pandorei
+	3: "os-ctf-chal3", // Imaginea Vorbăreață
+	4: "os-ctf-chal4", // Cifrul lui Cezar (ROT13)
+	5: "os-ctf-chal5", // Codul Ascuns (Base64)
+	6: "os-ctf-chal6", // Procesul Fantomă (variabilă de mediu)
+	7: "os-ctf-chal7", // Deghizarea (extensie mincinoasă)
+	8: "os-ctf-chal8", // Ușa Încuiată (sudo/permisiuni)
+	9: "os-ctf-chal9", // Straturi (encoding multi-strat)
 }
 
 var challengePoints = map[int]int{
@@ -85,9 +85,12 @@ var challengePoints = map[int]int{
 }
 
 
-var minecraftChallenges = map[int]bool{
-	10: true,
+var staticFlags = map[int]string{
+	10: "ATM_CTF{m1n3cr47t_is_f4n_3}",
 }
+
+
+var minecraftChallenges = map[int]bool{}
 
 
 const (
@@ -175,7 +178,7 @@ func buildInjectCommand(challengeID int, flag string) string {
 
 
 func injectMinecraftFlag(containerID string, flag string) error {
-	const maxAttempts = 40 // ~40 * 3s = 120s timeout maxim de așteptare
+	const maxAttempts = 40 
 
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -223,6 +226,28 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	var req VerifyRequest
 	json.NewDecoder(r.Body).Decode(&req)
 
+	resp := AuthResponse{}
+
+	
+	if staticFlag, isStatic := staticFlags[req.ChallengeID]; isStatic {
+		var userID int
+		err := db.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&userID)
+		if err != nil {
+			resp.Success = false
+			resp.Message = "Utilizator invalid."
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		
+		db.Exec(`
+			INSERT INTO active_challenges (user_id, challenge_id, dynamic_flag)
+			VALUES (?, ?, ?)
+			ON CONFLICT(user_id, challenge_id) DO UPDATE SET dynamic_flag = excluded.dynamic_flag`,
+			userID, req.ChallengeID, staticFlag)
+	}
+
 	
 	var dbFlag string
 	var solved bool
@@ -233,8 +258,6 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE u.username = ? AND ac.challenge_id = ?`,
 		req.Username, req.ChallengeID).Scan(&dbFlag, &solved)
 
-	resp := AuthResponse{}
-
 	if err != nil {
 		resp.Success = false
 		resp.Message = "Nu ai o instanță activă pentru acest challenge."
@@ -242,7 +265,7 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		resp.Success = false
 		resp.Message = "Ai rezolvat deja acest challenge! Poți relua provocarea oricând, dar punctele nu se mai adaugă a doua oară."
 	} else if req.Flag == dbFlag {
-		// 2. Flag corect! Actualizăm scorul și statusul
+		
 		points, ok := challengePoints[req.ChallengeID]
 		if !ok {
 			points = 10 // fallback de siguranță dacă challenge-ul nu e în map
@@ -278,7 +301,9 @@ func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	return r.Method == "OPTIONS"
 }
 
-
+// ==========================
+// RUTELE API
+// ==========================
 
 func authHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -538,7 +563,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		if injectCmd != "" {
 			injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
 			if injectErr != nil {
-				// Nu oprim tot procesul, dar logăm eroarea ca să știm dacă flag-ul chiar a fost scris
+				
 				log.Printf("[EROARE INJECT FLAG] %v | Output: %s", injectErr, strings.TrimSpace(string(injectOut)))
 			}
 		}
@@ -612,9 +637,11 @@ func main() {
 	http.HandleFunc("/api/verify_flag", verifyFlagHandler)
 	http.HandleFunc("/api/user_status", userStatusHandler)
 
+	
+	http.Handle("/", http.FileServer(http.Dir("./Website")))
+
 	fmt.Println("========================================")
 	fmt.Println("[*] Serverul OS-CTF")
-	fmt.Println("[*] Ascult pe portul 5000...")
 	fmt.Println("========================================")
 
 	log.Fatal(http.ListenAndServe(":5000", nil))

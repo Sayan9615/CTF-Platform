@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Afișarea numelui de utilizator ---
+    
     const urlParams = new URLSearchParams(window.location.search);
     const username = urlParams.get('username');
 
@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         displayElement.innerHTML = username ? `👤 ${username}` : `👤 Guest`;
     }
 
-    // --- Login: Autentificare (Comunicarea cu serverul Go) ---
+    
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
         let submitAction = 'login';
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const pass = loginForm.elements['password'].value;
 
             try {
-                const response = await fetch('http://localhost:5000/api/auth', {
+                const response = await fetch('/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: user, password: pass, action: submitAction })

@@ -1,8 +1,8 @@
 const CTF = (() => {
 
-    const API_BASE = 'http://localhost:5000';
+    const API_BASE = '';
 
-    // Aici am adăugat noile provocări bazate pe Dockerfile-urile tale
+    
     const CHALLENGES = [
         {
             id: 1,
@@ -78,12 +78,13 @@ const CTF = (() => {
         },
         {
            id: 10,
-           title: 'Min3cr47t',
+           title: 'M1n3cr4ft',
            category: 'Misc',
            points: 100,
            difficulty: 'hard',
-           connectionType: 'minecraft',
-           description: 'Pe server rulează o instanță de Minecraft (versiunea 26.2). Conectează-te la adresa primită mai jos și cauta flag-ul conform indiciilor.'
+           type: 'download',
+           downloadUrl: 'assets/CTF_MAP.zip',
+           description: 'Descarcă harta de mai jos și deschide-o local, în Minecraft (versiunea 26.2 singleplayer). Demonstrează-ți capacitățile de aventurier și caută flag-ul.'
         }
     ];
 
@@ -109,7 +110,7 @@ const CTF = (() => {
                     <span class="points">${ch.points} pts</span>
                 </div>
                 <h3>${ch.title}</h3>
-                <p class="difficulty ${ch.difficulty}">${ch.difficulty === 'easy' ? 'Ușor' : ch.difficulty === 'medium' ? 'Mediu' : 'Greu'}</p>
+                <p class="difficulty ${ch.difficulty}" ${ch.difficulty === 'hard' ? 'style="color:#ff3b3b;font-weight:bold;"' : ''}>${ch.difficulty === 'easy' ? 'Ușor' : ch.difficulty === 'medium' ? 'Mediu' : 'Greu'}</p>
                 <div class="status">${isSolved ? '✅ Rezolvat' : '▶️ Disponibil'}</div>
             `;
 
@@ -130,9 +131,30 @@ const CTF = (() => {
         const sshInfo = document.getElementById('ssh-info');
         const flagInput = document.getElementById('flag-input');
 
-        if (btnStart) btnStart.classList.remove('hidden');
-        if (sshInfo) sshInfo.classList.add('hidden');
+        
+        if (sshInfo) {
+            sshInfo.classList.add('hidden');
+            sshInfo.style.display = 'none';
+        }
         if (flagInput) flagInput.value = '';
+
+        if (ch.type === 'download') {
+           
+            if (btnStart) {
+                btnStart.classList.remove('hidden');
+                btnStart.innerText = '⬇️ Descarcă Harta';
+                btnStart.onclick = () => {
+                    window.location.href = ch.downloadUrl;
+                };
+            }
+        } else {
+            
+            if (btnStart) {
+                btnStart.classList.remove('hidden');
+                btnStart.innerText = 'Lansează Instanța';
+                btnStart.onclick = () => startInstance();
+            }
+        }
 
         document.getElementById('challenge-modal').classList.remove('hidden');
     }
@@ -154,26 +176,18 @@ const CTF = (() => {
             return;
         }
 
-        const ch = CHALLENGES.find(c => c.id === currentChallengeId);
-        const isMinecraft = ch && ch.connectionType === 'minecraft';
-
         document.getElementById('btn-start-instance').classList.add('hidden');
         const sshInfo = document.getElementById('ssh-info');
         sshInfo.classList.remove('hidden');
+        sshInfo.style.display = ''; // anulăm forțarea display:none din openModal
 
-        // Textul de instrucțiuni diferă: SSH cere comandă + parolă,
-        // Minecraft cere doar adresa de server (Direct Connect).
         const instructionsP = sshInfo.querySelector('p');
         if (instructionsP) {
-            instructionsP.innerHTML = isMinecraft
-                ? 'Conectează-te din Minecraft (Multiplayer → Direct Connect) la adresa de mai jos (versiune <strong>1.26.2</strong>):'
-                : 'Folosește comanda de mai jos în terminalul tău pentru a te conecta (Parola este <strong>student</strong>):';
+            instructionsP.innerHTML = 'Folosește comanda de mai jos în terminalul tău pentru a te conecta (Parola este <strong>student</strong>):';
         }
 
         const sshCommandText = document.getElementById('ssh-command');
-        sshCommandText.innerText = isMinecraft
-            ? "Se pornește serverul Minecraft... poate dura până la 1-2 minute la prima pornire."
-            : "Se creează mediul izolat... te rugăm așteaptă.";
+        sshCommandText.innerText = "Se creează mediul izolat... te rugăm așteaptă.";
         sshCommandText.style.color = "#ffcc00";
 
         try {
@@ -188,9 +202,7 @@ const CTF = (() => {
             const result = await response.json();
 
             if (result.success) {
-                sshCommandText.innerText = isMinecraft
-                    ? `127.0.0.1:${result.port}`
-                    : `ssh student@127.0.0.1 -p ${result.port}`;
+                sshCommandText.innerText = `ssh student@${window.location.hostname} -p ${result.port}`;
                 sshCommandText.style.color = "#00ffcc";
             } else {
                 sshCommandText.innerText = "Eroare: " + result.message;
