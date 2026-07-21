@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
@@ -60,15 +61,21 @@ type UserStatusResponse struct {
 
 
 var challengeImages = map[int]string{
-	1: "os-ctf-chal1", // Sanity Check
-	2: "os-ctf-chal2", // Cutia Pandorei
-	3: "os-ctf-chal3", // Imaginea Vorbăreață
-	4: "os-ctf-chal4", // Cifrul lui Cezar (ROT13)
-	5: "os-ctf-chal5", // Codul Ascuns (Base64)
-	6: "os-ctf-chal6", // Procesul Fantomă (variabilă de mediu)
-	7: "os-ctf-chal7", // Deghizarea (extensie mincinoasă)
-	8: "os-ctf-chal8", // Ușa Încuiată (sudo/permisiuni)
-	9: "os-ctf-chal9", // Straturi (encoding multi-strat)
+	1:  "os-ctf-chal1",
+	2:  "os-ctf-chal2",
+	3:  "os-ctf-chal3",
+	4:  "os-ctf-chal4",
+	5:  "os-ctf-chal5",
+	6:  "os-ctf-chal6",
+	7:  "os-ctf-chal7",
+	8:  "os-ctf-chal8",
+	9:  "os-ctf-chal9",
+	11: "os-ctf-chal11",
+	12: "os-ctf-chal12",
+	13: "os-ctf-chal13",
+	14: "os-ctf-chal14",
+	15: "os-ctf-chal15",
+	16: "os-ctf-chal16",
 }
 
 var challengePoints = map[int]int{
@@ -82,6 +89,12 @@ var challengePoints = map[int]int{
 	8:  30,
 	9:  60,
 	10: 100,
+	11: 60,
+	12: 40,
+	13: 40,
+	14: 40,
+	15: 45,
+	16: 40,
 }
 
 
@@ -112,6 +125,16 @@ func rot13(input string) string {
 		}
 	}
 	return strings.Map(rot, input)
+}
+
+func secureRandInt(max int) int {
+	b := make([]byte, 4)
+	rand.Read(b)
+	n := int(b[0])<<24 | int(b[1])<<16 | int(b[2])<<8 | int(b[3])
+	if n < 0 {
+		n = -n
+	}
+	return n % max
 }
 
 
@@ -171,6 +194,45 @@ func buildInjectCommand(challengeID int, flag string) string {
 		return fmt.Sprintf(
 			"echo '%s' > /home/student/layers.txt && chown student:student /home/student/layers.txt",
 			b64layers)
+	case 11:
+		pin := secureRandInt(10000)
+		return fmt.Sprintf(
+			"echo '%s' > /tmp/.f.txt && zip -j -P %04d /home/student/arhiva_secreta.zip /tmp/.f.txt >/dev/null && "+
+				"chown student:student /home/student/arhiva_secreta.zip && rm -f /tmp/.f.txt",
+			flag, pin)
+	case 12:
+		zipContent := fmt.Sprintf("echo '%s' > /tmp/.f.txt && zip -j /tmp/hidden.zip /tmp/.f.txt >/dev/null", flag)
+		return fmt.Sprintf(
+			"%s && cat /opt/cover_photo.jpg /tmp/hidden.zip > /home/student/photo.jpg && "+
+				"chown student:student /home/student/photo.jpg && rm -f /tmp/.f.txt /tmp/hidden.zip",
+			zipContent)
+	case 13:
+		return fmt.Sprintf(
+			`sqlite3 /home/student/app_backup.db "CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, note TEXT); INSERT INTO users (username, note) VALUES ('admin','reset pending'),('guest','temp account'),('service_bot','%s');" && chown student:student /home/student/app_backup.db`,
+			flag)
+	case 14:
+		return fmt.Sprintf(
+			"sed 's/FLAG_PLACEHOLDER/%s/' /opt/crackme_template.c > /tmp/crackme.c && "+
+				"gcc /tmp/crackme.c -o /home/student/crackme && chmod +x /home/student/crackme && "+
+				"chown student:student /home/student/crackme && rm -f /tmp/crackme.c",
+			flag)
+	case 15:
+		words := []string{"dragon", "monkey", "football", "baseball", "letmein", "master", "shadow", "summer", "sunshine", "princess", "superman", "trustno1", "whatever", "iloveyou", "starwars"}
+        word := words[secureRandInt(len(words))]
+        hashBytes := md5.Sum([]byte(word))
+        hashHex := hex.EncodeToString(hashBytes[:])
+        wordlist := strings.Join(words, "\n")
+        b64wordlist := base64.StdEncoding.EncodeToString([]byte(wordlist))
+        return fmt.Sprintf(
+            "echo 'hacker:%s' > /home/student/hash.txt && "+
+                "echo '%s' | base64 -d > /home/student/wordlist.txt && "+
+                "echo '%s' > '/home/student/.flag_%s.txt' && "+
+                "chown student:student /home/student/hash.txt /home/student/wordlist.txt '/home/student/.flag_%s.txt'",
+            hashHex, b64wordlist, flag, word, word)
+	case 16:
+		return fmt.Sprintf(
+			`python3 -c "data=open('/opt/traffic_template.pcap','rb').read(); data=data.replace(b'PLACEHOLDER_FLAGG_XXX', b'%s'); open('/home/student/traffic.pcap','wb').write(data)" && chown student:student /home/student/traffic.pcap`,
+			flag)
 	default:
 		return ""
 	}
@@ -195,7 +257,7 @@ func injectMinecraftFlag(containerID string, flag string) error {
 		return fmt.Errorf("RCON nu a devenit disponibil în timp util: %w", lastErr)
 	}
 
-	
+
 	forceloadOut, forceloadErr := exec.Command("docker", "exec", containerID, "rcon-cli",
 		fmt.Sprintf("forceload add %d %d", mcSignX, mcSignZ)).CombinedOutput()
 	if forceloadErr != nil {
@@ -268,7 +330,7 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		
 		points, ok := challengePoints[req.ChallengeID]
 		if !ok {
-			points = 10 // fallback de siguranță dacă challenge-ul nu e în map
+			points = 10 
 		}
 
 		db.Exec("UPDATE active_challenges SET solved = 1 WHERE user_id = (SELECT id FROM users WHERE username = ?) AND challenge_id = ?", req.Username, req.ChallengeID)
@@ -286,9 +348,9 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// Generează un flag aleatoriu de tip ATM_CTF{...}
+
 func generateDynamicFlag() string {
-	bytes := make([]byte, 6) // Generăm 6 bytes aleatori
+	bytes := make([]byte, 6) 
 	rand.Read(bytes)
 	return fmt.Sprintf("ATM_CTF{%s}", hex.EncodeToString(bytes))
 }
@@ -301,9 +363,7 @@ func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	return r.Method == "OPTIONS"
 }
 
-// ==========================
-// RUTELE API
-// ==========================
+
 
 func authHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -563,7 +623,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		if injectCmd != "" {
 			injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
 			if injectErr != nil {
-				
+				// Nu oprim tot procesul, dar logăm eroarea ca să știm dacă flag-ul chiar a fost scris
 				log.Printf("[EROARE INJECT FLAG] %v | Output: %s", injectErr, strings.TrimSpace(string(injectOut)))
 			}
 		}
@@ -583,7 +643,7 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[EROARE DB] Nu am putut salva datele instanței: %v", err)
 	}
 
-	
+	// 7. Trimitem succesul către frontend
 	resp.Success = true
 	resp.Message = "Instanță pornită cu succes!"
 	resp.Port = port

@@ -1,5 +1,6 @@
 const CTF = (() => {
 
+   
     const API_BASE = '';
 
     
@@ -85,6 +86,54 @@ const CTF = (() => {
            type: 'download',
            downloadUrl: 'assets/CTF_MAP.zip',
            description: 'Descarcă harta de mai jos și deschide-o local, în Minecraft (versiunea 26.2 singleplayer). Demonstrează-ți capacitățile de aventurier și caută flag-ul.'
+        },
+        {
+           id: 11,
+           title: 'Arhiva Blocată',
+           category: 'Criptografie',
+           points: 60,
+           difficulty: 'medium',
+           description: 'Pe server se află <b>arhiva_secreta.zip</b>, protejată cu o parolă de 4 cifre. Sparge parola (hint: <code>fcrackzip</code>) și extrage flag-ul.'
+        },
+        {
+           id: 12,
+           title: 'Fișierul din Fișier',
+           category: 'Forensics',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Fișierul <b>photo.jpg</b> ascunde mai mult decât pare .'
+        },
+        {
+           id: 13,
+           title: 'Baza Uitată',
+           category: 'Forensics',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Un fișier <b>app_backup.db</b> a rămas pe server de la o aplicație veche. Deschide-l cu <code>sqlite3</code> și explorează tabelele - flag-ul e ascuns într-un rând.'
+        },
+        {
+           id: 14,
+           title: 'Crackme',
+           category: 'Reversing',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Binarul <b>crackme</b> îți cere o parolă la rulare. Analizează-l.'
+        },
+        {
+           id: 15,
+           title: 'Sparge Hash-ul',
+           category: 'Criptografie',
+           points: 45,
+           difficulty: 'medium',
+           description: 'Fișierul <b>hash.txt</b> conține un hash MD5, iar <b>wordlist.txt</b> o listă de cuvinte candidate. Sparge hash-ul (<code>john</code>) ca să afli cuvântul, apoi caută fișierul ascuns care-i poartă numele.'
+        },
+        {
+           id: 16,
+           title: 'Capturat în Trafic',
+           category: 'Forensics',
+           points: 40,
+           difficulty: 'easy',
+           description: 'Fișierul <b>traffic.pcap</b> conține o captură de rețea. Undeva în trafic, flag-ul a fost trimis necriptat .'
         }
     ];
 
@@ -139,7 +188,7 @@ const CTF = (() => {
         if (flagInput) flagInput.value = '';
 
         if (ch.type === 'download') {
-           
+            
             if (btnStart) {
                 btnStart.classList.remove('hidden');
                 btnStart.innerText = '⬇️ Descarcă Harta';
@@ -148,7 +197,7 @@ const CTF = (() => {
                 };
             }
         } else {
-            
+            // Challenge normal: pornește o instanță Docker (SSH)
             if (btnStart) {
                 btnStart.classList.remove('hidden');
                 btnStart.innerText = 'Lansează Instanța';

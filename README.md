@@ -51,7 +51,7 @@ Project/
 ├── chal2_pandora/
 ├── chal3_imagine/
 ├── ...
-└── chal9_straturi/
+└── chal16_straturi/
 ```
 
 Fiecare folder `chalN_*` conține `Dockerfile` + `monitor.sh` folosit la build-ul imaginii `os-ctf-chalN`.
@@ -145,6 +145,12 @@ Frontend-ul (`ctf.js`) detectează automat adresa serverului din URL (`window.lo
 | 8 | Ușa Încuiată | permisiuni, `sudo`, ownership | Ușor | 30 |
 | 9 | Straturi | codare pe mai multe niveluri (hex/ROT13/Base64) | Mediu | 60 |
 | 10 | M1n3cr4ft | challenge bonus (hartă statică, fără server dedicat) | Greu | 100 |
+| 11 | Arhiva Blocată |arhive protejate cu parolă, brute-force (fcrackzip) | Mediu | 60 |
+| 12 | Fișierul din Fișier| forensics, fișiere ascunse în imagini | Ușor | 40 |
+| 13 | Baza Uitată | interogare baze de date SQLite `(sqlite3)` | Ușor | 40 |
+| 14 | Crackme | reverse engineering de bază, analiză executabile | Ușor | 40 |
+| 15 | Sparge Hash-ul | criptografie, spargere hash-uri MD5 (hashcat / john) | Mediu | 45 |
+| 16 | Capturat în Trafic | forensics, analiză de trafic de rețea (tshark / tcpdump) | Ușor | 40 |
 
 ---
 
