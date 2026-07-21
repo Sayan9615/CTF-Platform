@@ -51,7 +51,7 @@ Project/
 ├── chal2_pandora/
 ├── chal3_imagine/
 ├── ...
-└── chal16_straturi/
+└── chal16_pcap/
 ```
 
 Fiecare folder `chalN_*` conține `Dockerfile` + `monitor.sh` folosit la build-ul imaginii `os-ctf-chalN`.
