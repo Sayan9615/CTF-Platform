@@ -70,7 +70,7 @@ Fiecare folder `chalN_*` conține `Dockerfile` + `monitor.sh` folosit la build-u
 ```bash
 cd chal1_sanity/ && docker build -f Dockerfile -t os-ctf-chal1 . && cd ..
 cd chal2_pandora/ && docker build -f Dockerfile -t os-ctf-chal2 . && cd ..
-# ... la fel pentru chal3 → chal9
+# ... la fel pentru chal3 → chal17
 ```
 
 ### 2. Pornește serverul
