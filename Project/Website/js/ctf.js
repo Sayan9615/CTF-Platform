@@ -1,9 +1,7 @@
 const CTF = (() => {
 
-   
     const API_BASE = '';
 
-    
     const CHALLENGES = [
         {
             id: 1,
@@ -134,6 +132,14 @@ const CTF = (() => {
            points: 40,
            difficulty: 'easy',
            description: 'Fișierul <b>traffic.pcap</b> conține o captură de rețea. Undeva în trafic, flag-ul a fost trimis necriptat .'
+        },
+        {
+           id: 17,
+           title: 'Chestionarul Spațial',
+           category: 'Misc',
+           points: 100,
+           difficulty: 'hard',
+           description: 'Rulează <b>./quiz</b> și răspunde la 10 întrebări despre spațiu. La final, ți se cere un cod . Nu totul e ce pare - uneori ce contează nu e CE răspunzi, ci CUM răspunzi.'
         }
     ];
 
@@ -180,7 +186,6 @@ const CTF = (() => {
         const sshInfo = document.getElementById('ssh-info');
         const flagInput = document.getElementById('flag-input');
 
-        
         if (sshInfo) {
             sshInfo.classList.add('hidden');
             sshInfo.style.display = 'none';
@@ -188,7 +193,6 @@ const CTF = (() => {
         if (flagInput) flagInput.value = '';
 
         if (ch.type === 'download') {
-            
             if (btnStart) {
                 btnStart.classList.remove('hidden');
                 btnStart.innerText = '⬇️ Descarcă Harta';
@@ -197,7 +201,6 @@ const CTF = (() => {
                 };
             }
         } else {
-            // Challenge normal: pornește o instanță Docker (SSH)
             if (btnStart) {
                 btnStart.classList.remove('hidden');
                 btnStart.innerText = 'Lansează Instanța';
@@ -228,7 +231,7 @@ const CTF = (() => {
         document.getElementById('btn-start-instance').classList.add('hidden');
         const sshInfo = document.getElementById('ssh-info');
         sshInfo.classList.remove('hidden');
-        sshInfo.style.display = ''; // anulăm forțarea display:none din openModal
+        sshInfo.style.display = '';
 
         const instructionsP = sshInfo.querySelector('p');
         if (instructionsP) {
@@ -353,7 +356,6 @@ window.openModal = (id) => CTF.openModal(id);
 window.closeModal = () => CTF.closeModal();
 window.startInstance = () => CTF.startInstance();
 window.submitFlag = (e) => CTF.submitFlag(e);
-
 
 document.addEventListener('DOMContentLoaded', () => {
     CTF.init();

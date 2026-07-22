@@ -28,7 +28,7 @@ Utilizatorii se autentifică, aleg un challenge din dashboard, pornesc o instan�
 - **Backend**: un singur binar Go (`server.go`) care servește atât API-ul (`/api/...`), **cât și fișierele front-end** (nu mai e nevoie de alt webserver, ex. Python).
 - **Bază de date**: SQLite (`ctf_platform.db`), creată automat la prima pornire — ține conturile, scorurile și starea fiecărui challenge per utilizator.
 - **Izolare**: fiecare challenge SSH rulează într-un container Docker separat, cu flag generat dinamic la pornire și un port SSH unic alocat automat.
-- **Auto-cleanup**: containerele au un script (`monitor.sh`) care oprește și șterge automat instanța când studentul se deconectează (fără intervenție manuală).
+- **Auto-cleanup**: containerele au un script (`monitor.sh`) care oprește și șterge automat instanța când user-ul se deconectează (fără intervenție manuală).
 
 ---
 
@@ -51,7 +51,7 @@ Project/
 ├── chal2_pandora/
 ├── chal3_imagine/
 ├── ...
-└── chal16_straturi/
+└── chal17_quiz/
 ```
 
 Fiecare folder `chalN_*` conține `Dockerfile` + `monitor.sh` folosit la build-ul imaginii `os-ctf-chalN`.
@@ -151,13 +151,14 @@ Frontend-ul (`ctf.js`) detectează automat adresa serverului din URL (`window.lo
 | 14 | Crackme | reverse engineering de bază, analiză executabile | Ușor | 40 |
 | 15 | Sparge Hash-ul | criptografie, spargere hash-uri MD5 (hashcat / john) | Mediu | 45 |
 | 16 | Capturat în Trafic | forensics, analiză de trafic de rețea (tshark / tcpdump) | Ușor | 40 |
+| 17 | Chestionarul Spatial | reverse engineering, analiză dinamică (ltrace), logică de input | Greu | 100
 
 ---
 
 ## Cum adaugi un challenge nou
 
 1. **Definește-l** în `Website/js/ctf.js`, în array-ul `CHALLENGES` (id, titlu, categorie, puncte, dificultate, descriere).
-2. **Creează imaginea Docker** (`Dockerfile.chalN` + `monitor.sh`, după modelul celorlalte).
+2. **Creează imaginea Docker** (`Dockerfile` + `monitor.sh`, după modelul celorlalte).
 3. **Înregistrează-l** în `server.go`:
    - adaugă imaginea în `challengeImages`
    - adaugă punctajul în `challengePoints`

@@ -22,9 +22,6 @@ import (
 
 var db *sql.DB
 
-// ==========================
-// STRUCTURI DE DATE
-// ==========================
 type AuthRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -59,7 +56,6 @@ type UserStatusResponse struct {
 	Solved  []int `json:"solved"`
 }
 
-
 var challengeImages = map[int]string{
 	1:  "os-ctf-chal1",
 	2:  "os-ctf-chal2",
@@ -76,6 +72,7 @@ var challengeImages = map[int]string{
 	14: "os-ctf-chal14",
 	15: "os-ctf-chal15",
 	16: "os-ctf-chal16",
+	17: "os-ctf-chal17",
 }
 
 var challengePoints = map[int]int{
@@ -95,23 +92,20 @@ var challengePoints = map[int]int{
 	14: 40,
 	15: 45,
 	16: 40,
+	17: 100,
 }
-
 
 var staticFlags = map[int]string{
 	10: "ATM_CTF{m1n3cr47t_is_f4n_3}",
 }
 
-
 var minecraftChallenges = map[int]bool{}
-
 
 const (
 	mcSignX = -965
 	mcSignY = 14
 	mcSignZ = -611
 )
-
 
 func rot13(input string) string {
 	rot := func(r rune) rune {
@@ -137,24 +131,19 @@ func secureRandInt(max int) int {
 	return n % max
 }
 
-
 func buildInjectCommand(challengeID int, flag string) string {
 	switch challengeID {
 	case 1:
-		
 		return fmt.Sprintf("echo '%s' > /home/student/bun_venit.txt", flag)
 	case 2:
-		
 		return fmt.Sprintf(
 			"sed -i 's/FLAG_PLACEHOLDER/%s/' /opt/pandora_src/.sys_cache.dat && "+
 				"cd /opt/pandora_src && zip -j /home/student/misiune.zip readme.txt notes.txt config.yml access.log todo.md .sys_cache.dat >/dev/null && "+
 				"chown student:student /home/student/misiune.zip",
 			flag)
 	case 3:
-		
 		return fmt.Sprintf("echo '%s' >> /home/student/imagine.jpg", flag)
 	case 4:
-		
 		plain := fmt.Sprintf(
 			"Salut! Acest mesaj este criptat cu ROT13 (Cifrul lui Cezar).\nDecodeaza-l ca sa gasesti flag-ul.\n\n%s\n",
 			flag)
@@ -164,30 +153,25 @@ func buildInjectCommand(challengeID int, flag string) string {
 			"echo '%s' | base64 -d > /home/student/mesaj_secret.txt && chown student:student /home/student/mesaj_secret.txt",
 			b64)
 	case 5:
-		
 		b64 := base64.StdEncoding.EncodeToString([]byte(flag))
 		return fmt.Sprintf(
 			"echo '%s' > /home/student/secret.b64 && chown student:student /home/student/secret.b64",
 			b64)
 	case 6:
-		
 		return fmt.Sprintf(
 			`su - student -c "env FLAG='%s' setsid sleep infinity < /dev/null > /dev/null 2>&1 &"`,
 			flag)
 	case 7:
-		
 		content := fmt.Sprintf("Raport confidential. Nu distribui acest fisier.\n%s\n", flag)
 		b64content := base64.StdEncoding.EncodeToString([]byte(content))
 		return fmt.Sprintf(
 			"echo '%s' | base64 -d > /home/student/poza.png && chown student:student /home/student/poza.png",
 			b64content)
 	case 8:
-		
 		return fmt.Sprintf(
 			"echo '%s' > /root/secret.txt && chmod 600 /root/secret.txt && chown root:root /root/secret.txt",
 			flag)
 	case 9:
-		
 		hexEncoded := hex.EncodeToString([]byte(flag))
 		rotated := rot13(hexEncoded)
 		b64layers := base64.StdEncoding.EncodeToString([]byte(rotated))
@@ -218,29 +202,40 @@ func buildInjectCommand(challengeID int, flag string) string {
 			flag)
 	case 15:
 		words := []string{"dragon", "monkey", "football", "baseball", "letmein", "master", "shadow", "summer", "sunshine", "princess", "superman", "trustno1", "whatever", "iloveyou", "starwars"}
-        word := words[secureRandInt(len(words))]
-        hashBytes := md5.Sum([]byte(word))
-        hashHex := hex.EncodeToString(hashBytes[:])
-        wordlist := strings.Join(words, "\n")
-        b64wordlist := base64.StdEncoding.EncodeToString([]byte(wordlist))
-        return fmt.Sprintf(
-            "echo 'hacker:%s' > /home/student/hash.txt && "+
-                "echo '%s' | base64 -d > /home/student/wordlist.txt && "+
-                "echo '%s' > '/home/student/.flag_%s.txt' && "+
-                "chown student:student /home/student/hash.txt /home/student/wordlist.txt '/home/student/.flag_%s.txt'",
-            hashHex, b64wordlist, flag, word, word)
+		word := words[secureRandInt(len(words))]
+		hashBytes := md5.Sum([]byte(word))
+		hashHex := hex.EncodeToString(hashBytes[:])
+		wordlist := strings.Join(words, "\n")
+		b64wordlist := base64.StdEncoding.EncodeToString([]byte(wordlist))
+		return fmt.Sprintf(
+			"echo 'hacker:%s' > /home/student/hash.txt && "+
+				"echo '%s' | base64 -d > /home/student/wordlist.txt && "+
+				"echo '%s' > '/home/student/.flag_%s.txt' && "+
+				"chown student:student /home/student/hash.txt /home/student/wordlist.txt '/home/student/.flag_%s.txt'",
+			hashHex, b64wordlist, flag, word, word)
 	case 16:
 		return fmt.Sprintf(
 			`python3 -c "data=open('/opt/traffic_template.pcap','rb').read(); data=data.replace(b'PLACEHOLDER_FLAGG_XXX', b'%s'); open('/home/student/traffic.pcap','wb').write(data)" && chown student:student /home/student/traffic.pcap`,
 			flag)
+	case 17:
+		key := byte(0x5A)
+		encBytes := make([]string, len(flag))
+		for i := 0; i < len(flag); i++ {
+			encBytes[i] = fmt.Sprintf("0x%02x", flag[i]^key)
+		}
+		encArray := strings.Join(encBytes, ",")
+		return fmt.Sprintf(
+			"sed -e 's/ENC_FLAG_PLACEHOLDER/%s/' -e 's/ENC_LEN_PLACEHOLDER/%d/' /opt/quiz_template.c > /tmp/quiz.c && "+
+				"gcc /tmp/quiz.c -o /home/student/quiz && strip /home/student/quiz && chmod +x /home/student/quiz && "+
+				"chown student:student /home/student/quiz && rm -f /tmp/quiz.c",
+			encArray, len(flag))
 	default:
 		return ""
 	}
 }
 
-
 func injectMinecraftFlag(containerID string, flag string) error {
-	const maxAttempts = 40 
+	const maxAttempts = 40
 
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -257,7 +252,6 @@ func injectMinecraftFlag(containerID string, flag string) error {
 		return fmt.Errorf("RCON nu a devenit disponibil în timp util: %w", lastErr)
 	}
 
-
 	forceloadOut, forceloadErr := exec.Command("docker", "exec", containerID, "rcon-cli",
 		fmt.Sprintf("forceload add %d %d", mcSignX, mcSignZ)).CombinedOutput()
 	if forceloadErr != nil {
@@ -265,7 +259,6 @@ func injectMinecraftFlag(containerID string, flag string) error {
 	}
 	log.Printf("[MINECRAFT] Forceload aplicat pe chunk-ul semnului: %s", strings.TrimSpace(string(forceloadOut)))
 
-	
 	nbtCommand := fmt.Sprintf(
 		`data merge block %d %d %d {front_text:{messages:['"%s"','""','""','""']}}`,
 		mcSignX, mcSignY, mcSignZ, flag)
@@ -278,8 +271,6 @@ func injectMinecraftFlag(containerID string, flag string) error {
 	return nil
 }
 
-
-
 func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
 		return
@@ -290,7 +281,6 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := AuthResponse{}
 
-	
 	if staticFlag, isStatic := staticFlags[req.ChallengeID]; isStatic {
 		var userID int
 		err := db.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&userID)
@@ -302,7 +292,6 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		
 		db.Exec(`
 			INSERT INTO active_challenges (user_id, challenge_id, dynamic_flag)
 			VALUES (?, ?, ?)
@@ -310,7 +299,6 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 			userID, req.ChallengeID, staticFlag)
 	}
 
-	
 	var dbFlag string
 	var solved bool
 	err := db.QueryRow(`
@@ -327,10 +315,9 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 		resp.Success = false
 		resp.Message = "Ai rezolvat deja acest challenge! Poți relua provocarea oricând, dar punctele nu se mai adaugă a doua oară."
 	} else if req.Flag == dbFlag {
-		
 		points, ok := challengePoints[req.ChallengeID]
 		if !ok {
-			points = 10 
+			points = 10
 		}
 
 		db.Exec("UPDATE active_challenges SET solved = 1 WHERE user_id = (SELECT id FROM users WHERE username = ?) AND challenge_id = ?", req.Username, req.ChallengeID)
@@ -348,13 +335,11 @@ func verifyFlagHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-
 func generateDynamicFlag() string {
-	bytes := make([]byte, 6) 
+	bytes := make([]byte, 6)
 	rand.Read(bytes)
 	return fmt.Sprintf("ATM_CTF{%s}", hex.EncodeToString(bytes))
 }
-
 
 func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -362,8 +347,6 @@ func setupCORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	return r.Method == "OPTIONS"
 }
-
-
 
 func authHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
@@ -421,7 +404,6 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-
 func userStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if setupCORS(w, r) {
 		return
@@ -471,7 +453,6 @@ func userStatusHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-
 func findFreePort(startFrom int) int {
 	used := map[int]bool{}
 
@@ -504,7 +485,6 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := StartResponse{}
 
-	
 	var userID int
 	err := db.QueryRow("SELECT id FROM users WHERE username = ?", req.Username).Scan(&userID)
 	if err != nil {
@@ -515,7 +495,6 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
 	image, ok := challengeImages[req.ChallengeID]
 	if !ok {
 		resp.Success = false
@@ -527,7 +506,6 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[DOCKER] Pregătesc instanța pentru %s (Challenge %d)", req.Username, req.ChallengeID)
 
-	
 	internalPort := 22
 	portRangeStart := 2200
 	if minecraftChallenges[req.ChallengeID] {
@@ -536,28 +514,24 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	port := findFreePort(portRangeStart)
 
-	
 	flag := generateDynamicFlag()
 
-	
 	var out []byte
 	const maxRetries = 5
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		cmd := exec.Command("docker", "run", "-d", "--rm", "-p", fmt.Sprintf("%d:%d", port, internalPort), image)
 
-		
 		out, err = cmd.CombinedOutput()
 
 		if err == nil {
-			break // succes
+			break
 		}
 
 		outStr := strings.TrimSpace(string(out))
 		log.Printf("[EROARE DOCKER] Portul %d indisponibil: %s", port, outStr)
 
 		if strings.Contains(outStr, "port is already allocated") || strings.Contains(outStr, "Bind for") {
-			
 			lines := strings.Split(outStr, "\n")
 			if len(lines) > 0 {
 				possibleID := strings.TrimSpace(lines[0])
@@ -566,11 +540,10 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[CLEANUP] Am șters containerul orfan %s creat pe portul ocupat %d", possibleID[:12], port)
 				}
 			}
-			port++ // încercăm portul următor
+			port++
 			continue
 		}
 
-		
 		break
 	}
 
@@ -584,7 +557,6 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
 	containerID := strings.TrimSpace(string(out))
 
 	if containerID == "" {
@@ -602,13 +574,11 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[DOCKER] Container pornit: %s pe portul %d", shortID, port)
 
-	
 	if minecraftChallenges[req.ChallengeID] {
 		if injErr := injectMinecraftFlag(containerID, flag); injErr != nil {
 			log.Printf("[EROARE INJECT FLAG MINECRAFT] %v", injErr)
 		}
 
-		
 		go func(cid string) {
 			time.Sleep(30 * time.Minute)
 			exec.Command("docker", "stop", cid).Run()
@@ -623,13 +593,11 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		if injectCmd != "" {
 			injectOut, injectErr := exec.Command("docker", "exec", containerID, "bash", "-c", injectCmd).CombinedOutput()
 			if injectErr != nil {
-				// Nu oprim tot procesul, dar logăm eroarea ca să știm dacă flag-ul chiar a fost scris
 				log.Printf("[EROARE INJECT FLAG] %v | Output: %s", injectErr, strings.TrimSpace(string(injectOut)))
 			}
 		}
 	}
 
-	
 	_, err = db.Exec(`
 		INSERT INTO active_challenges (user_id, challenge_id, container_id, ssh_port, dynamic_flag) 
 		VALUES (?, ?, ?, ?, ?)
@@ -643,7 +611,6 @@ func startChallengeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[EROARE DB] Nu am putut salva datele instanței: %v", err)
 	}
 
-	// 7. Trimitem succesul către frontend
 	resp.Success = true
 	resp.Message = "Instanță pornită cu succes!"
 	resp.Port = port
@@ -660,7 +627,6 @@ func main() {
 	}
 	defer db.Close()
 
-	
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -697,7 +663,6 @@ func main() {
 	http.HandleFunc("/api/verify_flag", verifyFlagHandler)
 	http.HandleFunc("/api/user_status", userStatusHandler)
 
-	
 	http.Handle("/", http.FileServer(http.Dir("./Website")))
 
 	fmt.Println("========================================")
